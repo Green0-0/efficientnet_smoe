@@ -1,0 +1,12 @@
+torch
+torchvision
+optuna
+optuna-dashboard
+wandb
+numpy
+tqdm
+pyyaml
+pytest
+ruff
+ipykernel
+scipy
