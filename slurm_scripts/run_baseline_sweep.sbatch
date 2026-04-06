@@ -11,4 +11,4 @@
 
 source .venv/bin/activate
 
-python ai_slop/actually_works/baseline_fast_sweep_log.py
+python ai_slop/baseline_fast_sweep_log.py
