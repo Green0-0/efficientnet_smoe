@@ -185,9 +185,9 @@ def get_dataloaders(data_dir, batch_size, num_workers=8):
     val_dataset = torch.utils.data.Subset(full_val_dataset, val_indices)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
-                              num_workers=num_workers, pin_memory=True)
+                              num_workers=num_workers, pin_memory=True, persistent_workers=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, 
-                            num_workers=num_workers, pin_memory=True)
+                            num_workers=min(2, num_workers), pin_memory=True, persistent_workers=True)
 
     return train_loader, val_loader, num_classes
 
@@ -199,7 +199,7 @@ def objective(trial):
     
     # Adhere to linear scaling dynamically for batch size sweeping
     base_lr_mult = trial.suggest_float("base_lr_mult", 1e-4, 1.0, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
+    batch_size = trial.suggest_categorical("batch_size", [256, 512, 1024])
     lr = base_lr_mult * (batch_size / 256.0)
     
     # Initialize WandB
@@ -223,11 +223,11 @@ def objective(trial):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     slurm_cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', 4))
-    num_workers = max(1, min(4, slurm_cpus // 2))
+    num_workers = max(1, slurm_cpus - 2)
     train_loader, val_loader, num_classes = get_dataloaders(data_dir, batch_size, num_workers=num_workers)
     model = EfficientNetB0(num_classes=num_classes).to(device)
     
-    TARGET_EPOCHS = 30
+    TARGET_EPOCHS = 20
     WARMUP_EPOCHS = 2
     
     warmup_steps = int(WARMUP_EPOCHS * len(train_loader))
