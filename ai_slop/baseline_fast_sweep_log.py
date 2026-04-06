@@ -204,7 +204,7 @@ def objective(trial):
     
     # Initialize WandB
     run = wandb.init(
-        project="efficientnet_tpe_sweep",
+        project="efficientnet_tpe_sweep_2",
         group="slurm_sweep",
         name=f"trial_{trial.number}_bs{batch_size}",
         config={
@@ -378,7 +378,7 @@ if __name__ == "__main__":
     )
     
     study = optuna.create_study(
-        study_name="efficientnet_tpe_sweep",
+        study_name="efficientnet_tpe_sweep_2",
         storage=storage,
         sampler=sampler,
         pruner=pruner,
