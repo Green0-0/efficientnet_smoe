@@ -1,0 +1,9 @@
+4/5/2026
+Made baseline_fast_sweep_log.py
+This is a rework of the efficientnet training process for inaturalist that makes it finish training in a few hours instead of up to a week.
+It uses optuna for hyperparameter sweeping and wandb for logging
+- Specified batch size and lr for sweeping, where lr is a linear function of batch size
+- Exact copy of efficientnet-b0 architecture (~5m params iirc)
+- Swapped exp scheduler for cosine, due to reduced epoch count (350 -> 30)
+- Uses inaturalist mini, which has 50 data points per class and 10k or so classes
+- Does stratified splitting so that each class has an equal number of validation rows and there isn't class imbalance

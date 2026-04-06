@@ -218,7 +218,7 @@ def objective(trial):
         reinit=True
     )
     
-    data_dir = './data' 
+    data_dir = '/usr/project/xtmp/inaturalistdata_store' 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     slurm_cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', 4))
