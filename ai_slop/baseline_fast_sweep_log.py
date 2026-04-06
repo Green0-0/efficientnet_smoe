@@ -218,6 +218,7 @@ def objective(trial):
         reinit=True
     )
     
+    # WARNING: THE DATASET IS 44GB!
     data_dir = '/usr/project/xtmp/inaturalistdata_store' 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
