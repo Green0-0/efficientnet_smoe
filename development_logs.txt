@@ -7,3 +7,11 @@ It uses optuna for hyperparameter sweeping and wandb for logging
 - Swapped exp scheduler for cosine, due to reduced epoch count (350 -> 30)
 - Uses inaturalist mini, which has 50 data points per class and 10k or so classes
 - Does stratified splitting so that each class has an equal number of validation rows and there isn't class imbalance
+
+4/6/26-4/7/26
+Decided to sweep batch size 1024/2048, but it would OOM. Switched to bsz=256 with grad accum [1,8]
+Modified the slurm script to use 96GB of ram and 16 CPUs, this should speed up time spent accessing data from SSD, in theory.
+Also reduced epochs to 20.
+Ideally, we should have 3 hrs/run, so for 10 gpus we would get 80 runs a day, which will be sufficient for sweeping out MoE hyperparameters.
+Also reran the sweep to determine the optimal bsz/gradacc for the baseline model.
+With that data, it might be worth considering doing DDP training on the full dataset for 100 epochs with 4 nodes of 4 a5000s each.
