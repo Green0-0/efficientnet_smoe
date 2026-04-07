@@ -199,18 +199,22 @@ def objective(trial):
     
     # Adhere to linear scaling dynamically for batch size sweeping
     base_lr_mult = trial.suggest_float("base_lr_mult", 1e-4, 1.0, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [256, 512, 1024])
-    lr = base_lr_mult * (batch_size / 256.0)
+    batch_size = 256
+    grad_accum_steps = trial.suggest_int("grad_accum_steps", 1, 8)
+    global_batch_size = batch_size * grad_accum_steps
+    lr = base_lr_mult * (global_batch_size / 256.0)
     
     # Initialize WandB
     run = wandb.init(
         project="efficientnet_tpe_sweep_2",
         group="slurm_sweep",
-        name=f"trial_{trial.number}_bs{batch_size}",
+        name=f"trial_{trial.number}_bs{batch_size}_accum{grad_accum_steps}",
         config={
             "learning_rate": lr,
             "base_lr_mult": base_lr_mult,
             "batch_size": batch_size,
+            "grad_accum_steps": grad_accum_steps,
+            "global_batch_size": global_batch_size,
             "optimizer": "RMSProp",
             "model": "EfficientNet-B0 (Proxy 224x224)",
             "dataset": "iNaturalist 2021 Mini"
@@ -230,8 +234,9 @@ def objective(trial):
     TARGET_EPOCHS = 20
     WARMUP_EPOCHS = 2
     
-    warmup_steps = int(WARMUP_EPOCHS * len(train_loader))
-    total_steps = int(TARGET_EPOCHS * len(train_loader))
+    effective_steps_per_epoch = math.ceil(len(train_loader) / grad_accum_steps)
+    warmup_steps = int(WARMUP_EPOCHS * effective_steps_per_epoch)
+    total_steps = int(TARGET_EPOCHS * effective_steps_per_epoch)
     cosine_steps = max(1, total_steps - warmup_steps)
     
     decay_params = []
@@ -261,7 +266,7 @@ def objective(trial):
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     
     print(f"\n--- Starting Trial {trial.number} ---")
-    print(f"LR: {lr:.6f} | Batch Size: {batch_size}")
+    print(f"LR: {lr:.6f} | Batch Size: {batch_size} | Grad Accum: {grad_accum_steps} | Global BS: {global_batch_size}")
     
     global_step = 0
     final_val_acc = 0.0
@@ -271,27 +276,29 @@ def objective(trial):
             model.train()
             epoch_loss = 0.0
             
-            for images, labels in train_loader:
+            optimizer.zero_grad()
+            for i, (images, labels) in enumerate(train_loader):
 
                 images = images.to(device, non_blocking=True)
                 labels = labels.to(device, non_blocking=True)
                 
-                optimizer.zero_grad()
-                
                 with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
                     outputs = model(images)
                     loss = criterion(outputs, labels)
+                    loss = loss / grad_accum_steps
                 
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
-                optimizer.step()
-                scheduler.step()
-
-                epoch_loss += loss.item()
+                epoch_loss += loss.item() * grad_accum_steps
                 
+                if (i + 1) % grad_accum_steps == 0 or (i + 1) == len(train_loader):
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
+                    optimizer.step()
+                    scheduler.step()
+                    optimizer.zero_grad()
+
                 if global_step % 50 == 0:
                     wandb.log({
-                        "train/step_loss": loss.item(),
+                        "train/step_loss": loss.item() * grad_accum_steps,
                         "train/learning_rate": scheduler.get_last_lr()[0],
                     }, step=global_step)
                     
