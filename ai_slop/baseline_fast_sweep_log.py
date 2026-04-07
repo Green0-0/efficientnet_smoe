@@ -385,7 +385,7 @@ if __name__ == "__main__":
     )
     
     study = optuna.create_study(
-        study_name="efficientnet_tpe_sweep_2",
+        study_name="efficientnet_tpe_sweep_3",
         storage=storage,
         sampler=sampler,
         pruner=pruner,
