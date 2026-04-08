@@ -15,3 +15,8 @@ Also reduced epochs to 20.
 Ideally, we should have 3 hrs/run, so for 10 gpus we would get 80 runs a day, which will be sufficient for sweeping out MoE hyperparameters.
 Also reran the sweep to determine the optimal bsz/gradacc for the baseline model.
 With that data, it might be worth considering doing DDP training on the full dataset for 100 epochs with 4 nodes of 4 a5000s each.
+
+4/7/26-4/9/26
+Implemented the two starred moe papers in cnnmoe.md with AI; the AI was told to implement the logic in whichever way deemed appropriate, and some unknown architecture adjustments were made.
+The model was told to keep parameter count increase under 20%, and target a sparsity rate from 30-50%.
+Hyperparameter sweep for both scripts began, so far, deepmoe seems to have one example converged with 50% sparsity, sweetmoe is struggling.

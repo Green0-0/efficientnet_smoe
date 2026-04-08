@@ -379,6 +379,9 @@ def objective(trial):
                 if global_step % 50 == 0:
                     wandb.log({
                         "train/step_loss": loss.item() * grad_accum_steps,
+                        "train/step_loss_main": loss_main.item(),
+                        "train/step_loss_aux": loss_aux.item(),
+                        "train/step_l1_loss": l1_loss.item(),
                         "train/learning_rate": scheduler.get_last_lr()[0],
                         "train/active_experts_pct": active_pct.item(),
                     }, step=global_step)
