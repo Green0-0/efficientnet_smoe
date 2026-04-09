@@ -20,3 +20,10 @@ With that data, it might be worth considering doing DDP training on the full dat
 Implemented the two starred moe papers in cnnmoe.md with AI; the AI was told to implement the logic in whichever way deemed appropriate, and some unknown architecture adjustments were made.
 The model was told to keep parameter count increase under 20%, and target a sparsity rate from 30-50%.
 Hyperparameter sweep for both scripts began, so far, deepmoe seems to have one example converged with 50% sparsity, sweetmoe is struggling.
+
+4/9/26
+Slightly modified sweep ranges (lr, gradacc, lambdag for deepmoe) based on new information.
+Both sweetmoe and deepmoe have converged to a reasonable validation (-7% from dense approx).
+Sweetmoe has sparsity of around 5%, deepmoe has sparsity from 5-15%. FLOP savings are approximately double that.
+In practice, with the added overhead from the router, the gains can be halved(?)
+Also, created a loose implementation of the conditional convolution/dynamic attention convolution. However, this does not fit the paper requirements, and seems like a waste of time to pursue, so it will be axed.

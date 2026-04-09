@@ -198,9 +198,9 @@ def objective(trial):
     trial_start_time = time.time()
     
     # Adhere to linear scaling dynamically for batch size sweeping
-    base_lr_mult = trial.suggest_float("base_lr_mult", 1e-4, 1.0, log=True)
+    base_lr_mult = trial.suggest_float("base_lr_mult", 0.0001, 0.01)
     batch_size = 256
-    grad_accum_steps = trial.suggest_int("grad_accum_steps", 1, 8)
+    grad_accum_steps = trial.suggest_int("grad_accum_steps", 4, 16, 2)
     global_batch_size = batch_size * grad_accum_steps
     lr = base_lr_mult * (global_batch_size / 256.0)
     
