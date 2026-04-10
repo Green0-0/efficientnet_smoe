@@ -475,4 +475,4 @@ if __name__ == "__main__":
         load_if_exists=True, direction="maximize"
     )
     
-    study.optimize(objective, n_trials=30)
+    study.optimize(objective, n_trials=7)

@@ -396,7 +396,7 @@ if __name__ == "__main__":
         direction="maximize"
     )
     
-    N_TRIALS_PER_NODE = 30
+    N_TRIALS_PER_NODE = 7
     print(f"Node startup: attempting {N_TRIALS_PER_NODE} trials...")
     
     study.optimize(objective, n_trials=N_TRIALS_PER_NODE)

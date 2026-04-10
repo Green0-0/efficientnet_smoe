@@ -479,5 +479,5 @@ if __name__ == "__main__":
         load_if_exists=True, direction="maximize"
     )
     
-    N_TRIALS_PER_NODE = 30
+    N_TRIALS_PER_NODE = 7
     study.optimize(objective, n_trials=N_TRIALS_PER_NODE)

@@ -470,4 +470,4 @@ if __name__ == "__main__":
     pruner = optuna.pruners.MedianPruner(n_startup_trials=20, n_warmup_steps=10, interval_steps=5)
     
     study = optuna.create_study(study_name="efficientnet_moe_sweep_final", storage=storage, sampler=sampler, pruner=pruner, load_if_exists=True, direction="maximize")
-    study.optimize(objective, n_trials=30)
+    study.optimize(objective, n_trials=7)

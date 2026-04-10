@@ -3,7 +3,7 @@
 - put chatgpt generated code in ai_slop
 - final code will go in scripts
 - ``pip install uv``, ``uv venv --python 3.12``, ``uv pip install -r requirements.txt`` :)
-
+- ``optuna-dashboard sweep_results/journal1.log`` to view database
 # Problems (so many)
 - The project lists a bunch of papers about MoE and vMOE
     - None of those papers are applicable to a CNN (EfficientNet B0)

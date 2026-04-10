@@ -27,3 +27,6 @@ Both sweetmoe and deepmoe have converged to a reasonable validation (-7% from de
 Sweetmoe has sparsity of around 5%, deepmoe has sparsity from 5-15%. FLOP savings are approximately double that.
 In practice, with the added overhead from the router, the gains can be halved(?)
 Also, created a loose implementation of the conditional convolution/dynamic attention convolution. However, this does not fit the paper requirements, and seems like a waste of time to pursue, so it will be axed.
+
+4/10/26
+Migrated databases.
