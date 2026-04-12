@@ -1,4 +1,3 @@
-
 ⭐ Deep Mixture of Experts via Shallow Embedding https://arxiv.org/abs/1806.01531 
 - Kinda old, but might serve as a baseline...
 - Also this is sparsity and not MoE so I'm not sure if it applies
