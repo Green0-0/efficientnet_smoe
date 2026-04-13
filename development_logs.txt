@@ -30,3 +30,8 @@ Also, created a loose implementation of the conditional convolution/dynamic atte
 
 4/10/26
 Migrated databases.
+
+4/12/26
+Decided to do transfer learning on the EfficientNet-B0. Transfer learning is cut into two stages, one where the head is trained and one where the body+head is trained. All parts use a different LR.
+Sweep is also done over epochs allocated to head, grad accum and weight decay. Dataset changed to iNat 2019 (oops) which is manually partitioned into 45/5/50 train/val/test for quicker training and no contamination.
+Used sqrt LR scaling instead of linear LR scaling. Also cleaned up the scripts manually.

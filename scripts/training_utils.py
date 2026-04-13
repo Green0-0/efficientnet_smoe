@@ -32,6 +32,7 @@ def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
 def get_dataloaders(batch_size):
     train_transforms = transforms.Compose(
         [
+            transforms.Lambda(lambda x: x.convert("RGB")),
             transforms.RandomResizedCrop(224),
             transforms.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
             transforms.ToTensor(),
@@ -41,6 +42,7 @@ def get_dataloaders(batch_size):
 
     val_transforms = transforms.Compose(
         [
+            transforms.Lambda(lambda x: x.convert("RGB")),
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),

@@ -13,7 +13,7 @@ import torchvision.models as models
 from torchvision.models import EfficientNet_B0_Weights
 
 from optuna.storages import JournalStorage, JournalFileStorage
-from scripts.training_utils import get_cosine_schedule_with_warmup, get_dataloaders, train_loop
+from training_utils import get_cosine_schedule_with_warmup, get_dataloaders, train_loop
 
 def objective(trial):
     trial_start_time = time.time()

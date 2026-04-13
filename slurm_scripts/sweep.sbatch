@@ -11,4 +11,4 @@
 
 source .venv/bin/activate
 
-python ai_slop/baseline_sweep.py
+python scripts/b0_baseline.py
