@@ -11,3 +11,4 @@ pytest
 ruff
 ipykernel
 scipy
+scikit-learn
