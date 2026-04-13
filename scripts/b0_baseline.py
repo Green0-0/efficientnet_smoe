@@ -112,7 +112,7 @@ def objective(trial):
 if __name__ == "__main__":
     SHARED_DIR = "./optuna_slurm_logs"
     os.makedirs(SHARED_DIR, exist_ok=True)
-    journal_file = os.path.join(SHARED_DIR, "optuna_journal.log")
+    journal_file = os.path.join(SHARED_DIR, "journal.log")
 
     storage = JournalStorage(JournalFileStorage(journal_file))
 
