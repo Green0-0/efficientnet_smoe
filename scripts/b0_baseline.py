@@ -27,10 +27,9 @@ def objective(trial):
     lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.005)
     lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.005)
     lr_body_mul = trial.suggest_float("lr_body_mul", 0.00001, 0.001)
-    LR_HEAD = lr_head_mul * GRAD_ACCUM_STEPS 
-    LR_HEAD2 = lr_head2_mul * GRAD_ACCUM_STEPS
-    LR_BODY = lr_body_mul * GRAD_ACCUM_STEPS 
-    # Note: Linear LR scaling was found to work well with RMSProp in a previous sweep, so it should be fine with ADAM
+    LR_HEAD = lr_head_mul * math.sqrt(GRAD_ACCUM_STEPS) 
+    LR_HEAD2 = lr_head2_mul * math.sqrt(GRAD_ACCUM_STEPS) 
+    LR_BODY = lr_body_mul * math.sqrt(GRAD_ACCUM_STEPS)  
     
     WEIGHT_DECAY = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
     
@@ -65,7 +64,7 @@ def objective(trial):
 
     head_optimizer = torch.optim.AdamW(head_params, lr=LR_HEAD, weight_decay=WEIGHT_DECAY)
 
-    scheduler = ConstantLR(head_optimizer, factor=1, total_iters=0)
+    scheduler = ConstantLR(head_optimizer, factor=1, total_iters=1)
     final_val_acc, pruned = train_loop(model, head_optimizer, scheduler, EPOCHS_HEAD, GRAD_ACCUM_STEPS, train_loader, val_loader, trial, 0)
     if pruned:
         total_runtime = time.time() - trial_start_time
@@ -73,6 +72,8 @@ def objective(trial):
         wandb.run.summary["total_runtime_seconds"] = total_runtime
         wandb.run.summary["final_val_acc"] = final_val_acc
         wandb.finish()
+        del model, head_optimizer, train_loader, val_loader
+        torch.cuda.empty_cache()
         raise optuna.exceptions.TrialPruned()
     
     for param in model.parameters():
@@ -93,10 +94,14 @@ def objective(trial):
     if pruned:
         wandb.run.summary["state"] = "pruned"
         wandb.finish()
+        del model, head_optimizer, body_optimizer, train_loader, val_loader
+        torch.cuda.empty_cache()
         raise optuna.exceptions.TrialPruned()
     else:
         wandb.run.summary["state"] = "completed"
         wandb.finish()
+        del model, head_optimizer, body_optimizer, train_loader, val_loader
+        torch.cuda.empty_cache()
     return final_val_acc
 
 if __name__ == "__main__":
@@ -109,7 +114,7 @@ if __name__ == "__main__":
     sampler = optuna.samplers.TPESampler(multivariate=True)
 
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=10, n_warmup_steps=5, interval_steps=3
+        n_startup_trials=10, n_warmup_steps=8, interval_steps=3
     )
 
     study = optuna.create_study(

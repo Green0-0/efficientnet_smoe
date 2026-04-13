@@ -69,7 +69,7 @@ def get_dataloaders(batch_size):
 
     # Do stratified split for train (45%), val (5%), test (50%), making sure every class gets the same proportion so no class disappears
     seed = 42
-    targets = full_train_dataset.targets 
+    targets = [cat_id for cat_id, fname in full_train_dataset.index]
     all_indices = list(range(len(full_train_dataset)))
 
     train_val_indices, test_indices = train_test_split(
@@ -184,11 +184,4 @@ def train_loop(model, optimizer, scheduler, epochs, grad_accum_steps, train_load
     except Exception as e:
         wandb.run.summary["state"] = "crashed"
         raise e
-    finally:
-        try:
-            del images, labels, outputs, loss
-        except NameError:
-            pass
-        del model, optimizer, train_loader, val_loader, scheduler
-        torch.cuda.empty_cache()
     return final_val_acc, False
