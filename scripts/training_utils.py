@@ -69,21 +69,21 @@ def get_dataloaders(batch_size):
 
     num_classes = len(full_train_dataset.all_categories)
 
-    # Do stratified split for train (45%), val (5%), test (50%), making sure every class gets the same proportion so no class disappears
+    # Do stratified split for train (81%), val (9%), test (10%), making sure every class gets the same proportion so no class disappears
     seed = 42
     targets = [cat_id for cat_id, fname in full_train_dataset.index]
     all_indices = list(range(len(full_train_dataset)))
 
     train_val_indices, test_indices = train_test_split(
         all_indices,
-        test_size=0.50,
+        test_size=0.1,
         stratify=targets,
         random_state=seed
     )
     train_val_targets = [targets[i] for i in train_val_indices]
     train_indices, val_indices = train_test_split(
         train_val_indices,
-        test_size=0.10,
+        test_size=0.1,
         stratify=train_val_targets,
         random_state=seed
     )

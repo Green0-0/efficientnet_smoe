@@ -21,12 +21,12 @@ def objective(trial):
     
     BATCH_SIZE = 256
     GRAD_ACCUM_STEPS = trial.suggest_int("grad_accum_steps", 4, 16, 2)
-    EPOCHS_HEAD = trial.suggest_int("epochs_head", 1, 5, 1)
-    EPOCHS_BODY = 15 - EPOCHS_HEAD
+    EPOCHS_HEAD = trial.suggest_int("epochs_head", 0, 5, 1)
+    EPOCHS_BODY = 10 - EPOCHS_HEAD
 
-    lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.005)
-    lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.005)
-    lr_body_mul = trial.suggest_float("lr_body_mul", 0.00001, 0.001)
+    lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.01, log=True)
+    lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.01, log=True)
+    lr_body_mul = trial.suggest_float("lr_body_mul", 0.0001, 0.01, log=True)
     LR_HEAD = lr_head_mul * math.sqrt(GRAD_ACCUM_STEPS) 
     LR_HEAD2 = lr_head2_mul * math.sqrt(GRAD_ACCUM_STEPS) 
     LR_BODY = lr_body_mul * math.sqrt(GRAD_ACCUM_STEPS)  
@@ -62,19 +62,20 @@ def objective(trial):
         else:
             body_params.append(param)
 
-    head_optimizer = torch.optim.AdamW(head_params, lr=LR_HEAD, weight_decay=WEIGHT_DECAY)
+    if EPOCHS_HEAD != 0:
+        head_optimizer = torch.optim.AdamW(head_params, lr=LR_HEAD, weight_decay=WEIGHT_DECAY)
 
-    scheduler = ConstantLR(head_optimizer, factor=1, total_iters=1)
-    final_val_acc, pruned = train_loop(model, head_optimizer, scheduler, EPOCHS_HEAD, GRAD_ACCUM_STEPS, train_loader, val_loader, trial, 0)
-    if pruned:
-        total_runtime = time.time() - trial_start_time
-        wandb.run.summary["state"] = "pruned"
-        wandb.run.summary["total_runtime_seconds"] = total_runtime
-        wandb.run.summary["final_val_acc"] = final_val_acc
-        wandb.finish()
-        del model, head_optimizer, train_loader, val_loader
-        torch.cuda.empty_cache()
-        raise optuna.exceptions.TrialPruned()
+        scheduler = ConstantLR(head_optimizer, factor=1, total_iters=1)
+        final_val_acc, pruned = train_loop(model, head_optimizer, scheduler, EPOCHS_HEAD, GRAD_ACCUM_STEPS, train_loader, val_loader, trial, 0)
+        if pruned:
+            total_runtime = time.time() - trial_start_time
+            wandb.run.summary["state"] = "pruned"
+            wandb.run.summary["total_runtime_seconds"] = total_runtime
+            wandb.run.summary["final_val_acc"] = final_val_acc
+            wandb.finish()
+            del model, head_optimizer, train_loader, val_loader
+            torch.cuda.empty_cache()
+            raise optuna.exceptions.TrialPruned()
     
     for param in model.parameters():
         param.requires_grad = True
@@ -94,13 +95,17 @@ def objective(trial):
     if pruned:
         wandb.run.summary["state"] = "pruned"
         wandb.finish()
-        del model, head_optimizer, body_optimizer, train_loader, val_loader
+        del model, body_optimizer, train_loader, val_loader
+        if EPOCHS_HEAD != 0:
+            del head_optimizer
         torch.cuda.empty_cache()
         raise optuna.exceptions.TrialPruned()
     else:
         wandb.run.summary["state"] = "completed"
         wandb.finish()
-        del model, head_optimizer, body_optimizer, train_loader, val_loader
+        del model, body_optimizer, train_loader, val_loader
+        if EPOCHS_HEAD != 0:
+            del head_optimizer
         torch.cuda.empty_cache()
     return final_val_acc
 

@@ -35,3 +35,7 @@ Migrated databases.
 Decided to do transfer learning on the EfficientNet-B0. Transfer learning is cut into two stages, one where the head is trained and one where the body+head is trained. All parts use a different LR.
 Sweep is also done over epochs allocated to head, grad accum and weight decay. Dataset changed to iNat 2019 (oops) which is manually partitioned into 45/5/50 train/val/test for quicker training and no contamination.
 Used sqrt LR scaling instead of linear LR scaling. Also cleaned up the scripts manually.
+
+4/13/26
+The dataset proportion was wrong; 45/5/50 left way too little data in train, and it was about half as big as it should've been. Furthermore, optuna didn't really find anything, so the lr ranges was expanded.
+Epochs was dropped to 10 with a bigger split (81/9/10), and head epochs was allowed to be 0 such that it can be skipped.
