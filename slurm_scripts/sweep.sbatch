@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=a5000_job
+#SBATCH --job-name=a6000_job
 #SBATCH --output=output_%j.txt
 #SBATCH --error=error_%j.txt
 #SBATCH --time=1-00:00:00
