@@ -39,3 +39,10 @@ Used sqrt LR scaling instead of linear LR scaling. Also cleaned up the scripts m
 4/13/26
 The dataset proportion was wrong; 45/5/50 left way too little data in train, and it was about half as big as it should've been. Furthermore, optuna didn't really find anything, so the lr ranges was expanded.
 Epochs was dropped to 10 with a bigger split (81/9/10), and head epochs was allowed to be 0 such that it can be skipped.
+
+4/15/26
+Finished sweeping on the baseline. Surprisingly, it trains the fastest in one stage, not two (no seperate training for head). This is counterintuitive and goes against AI suggestions.
+Also began writing the b0_deepmoe. For consistency it will follow the logic in deepmoe_sweep, which has already been vetted to work.
+Currently 25% done, but the code is AI generated.
+It will be difficult to determine how to reliably create a scoring function such that Optuna finds a neural network that is both sparse and accurate.
+Maybe we could do (sparsity under 100%) - a * (accuracy from 70%), where a=10 so that we ideally want 10% sparsity for each 1% in accuracy.
