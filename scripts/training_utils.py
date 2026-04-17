@@ -187,3 +187,111 @@ def train_loop(model, optimizer, scheduler, epochs, grad_accum_steps, train_load
         wandb.run.summary["state"] = "crashed"
         raise e
     return final_val_acc, False
+
+def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, train_loader, val_loader, optuna_trial, optuna_trial_start_epoch, lambda_g, mu):
+    device = "cuda" # Note: An a5000 gpu or higher is expected, or the script will not work!
+    model.to(device)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+    global_step = 0
+
+    try:
+        for epoch in range(epochs):
+            model.train()
+            optimizer.zero_grad()
+            
+            for i, (images, labels) in enumerate(train_loader):
+                images = images.to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
+
+                with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                    main_logits, aux_logits, l1_loss, active_pct, flop_pct = model(images)
+                    loss_main = criterion(main_logits, labels)
+                    loss_aux = criterion(aux_logits, labels)
+                    loss = loss_main + mu * loss_aux + lambda_g * l1_loss 
+                    loss = loss / grad_accum_steps
+
+                loss.backward()
+                
+                if (i+1) % grad_accum_steps == 0 or (i + 1) == len(train_loader):
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
+                    scheduler.step()
+                    optimizer.zero_grad()
+                    
+                if global_step % 50 == 0:
+                    wandb.log(
+                        {
+                            "train/step_loss": loss.item() * grad_accum_steps,
+                            "train/step_loss_main": loss_main.item(),
+                            "train/step_loss_aux": loss_aux.item(),
+                            "train/step_l1_loss": l1_loss.item(),
+                            "train/active_experts_pct": active_pct.item(),
+                            "train/flop_util_pct": flop_pct.item(),
+                            "train/learning_rate": scheduler.get_last_lr()[0],
+                        }
+                    )
+                global_step += 1
+            
+            model.eval()
+            val_loss = 0.0
+            val_correct = 0
+            val_total = 0
+            val_flop_sum = 0.0
+            val_active_sum = 0.0
+
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images = images.to(device, non_blocking=True)
+                    labels = labels.to(device, non_blocking=True)
+
+                    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                        outputs, active_pct, flop_pct = model(images)
+                        loss = criterion(outputs, labels)
+
+                    val_loss += loss.item()
+                    val_active_sum += active_pct.item()
+                    val_flop_sum += flop_pct.item()
+                    
+                    _, predicted = outputs.max(1)
+                    val_total += labels.size(0)
+                    val_correct += predicted.eq(labels).sum().item()
+
+            final_val_acc = 100.0 * val_correct / val_total
+            avg_val_loss = val_loss / len(val_loader)
+            avg_val_active_pct = val_active_sum / len(val_loader)
+            avg_val_flop_pct = val_flop_sum / len(val_loader)
+            
+            flops_saved_pct = 1.0 - avg_val_flop_pct
+            tradeoff_bonus = flops_saved_pct * 10.0
+            epoch_score = final_val_acc + tradeoff_bonus
+            
+            target_low, target_high = 0.30, 0.50
+            if avg_val_flop_pct > target_high:
+                penalty = ((avg_val_flop_pct - target_high) / 0.10) ** 2 * 20.0
+            elif avg_val_flop_pct < target_low:
+                penalty = ((target_low - avg_val_flop_pct) / 0.10) ** 2 * 20.0
+            else:
+                penalty = 0.0
+            epoch_score = final_val_acc + tradeoff_bonus - penalty
+                
+            wandb.log(
+                {
+                    "val/accuracy": final_val_acc,
+                    "val/score": epoch_score,
+                    "val/tradeoff_bonus": tradeoff_bonus,
+                    "val/loss": avg_val_loss,
+                    "val/active_experts_pct": avg_val_active_pct,
+                    "val/flop_pct" : avg_val_flop_pct,
+                    "epoch": epoch + optuna_trial_start_epoch,
+                }
+            )
+            
+            if optuna_trial != None:
+                optuna_trial.report(epoch_score, epoch + optuna_trial_start_epoch)
+                if optuna_trial.should_prune():
+                    return epoch_score, True
+    except Exception as e:
+        wandb.run.summary["state"] = "crashed"
+        raise e
+    return epoch_score, False
