@@ -311,7 +311,7 @@ def objective(trial, b0_reference_flops):
     mu = trial.suggest_float("mu", 0, 1)
     moe_start_stage = trial.suggest_int("moe_start_stage", 1, 5, 1)
     latent_dim = trial.suggest_categorical("latent_dim", [32, 64, 128, 256])
-    lambda_g = trial.suggest_float("lambda_g", 1e-4, 1.0, log=True)
+    lambda_g = trial.suggest_float("lambda_g", 1e-4, 10, log=True)
     lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.1, log=True)
     lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.1, log=True)
     lr_body_mul = trial.suggest_float("lr_body_mul", 0.0001, 0.1, log=True)

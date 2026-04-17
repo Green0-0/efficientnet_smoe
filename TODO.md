@@ -1,8 +1,7 @@
 # Immediate
-- Double check the b0_deepmoe for correctness in the model architecture (I am using AI generated code that hot swaps the MBConv with a gated version, which should be superior to gating the conv outputs and matches the original sweep)
-- Modify the training script/model loading script in b0_deepmoe to load the new model architecture, and train with the correct loss function
-- Modify the hyperparameter sweeper to create a scoring function that trades sparsity for accuracy, and encourages 30%(?) sparsity and ~67% accuracy(?)
-- Do b1, b2... etc versions if we have time
+- Double check the deepmoe for correctness in the model architecture (I am using AI generated code that hot swaps the MBConv with a gated version, which should be superior to gating the conv outputs and matches the original sweep)
+- Add the second (rather, third) stage of training where the embedding is frozen, for some number of epochs
+- Accurate external FLOP profiler, calculate the number of FLOPs in the efficientnet
 
 # Later
 - Train the full models based on found hyperparameters on all the train/val data, and eval them on test
