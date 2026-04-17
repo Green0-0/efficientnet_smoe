@@ -311,7 +311,7 @@ def objective(trial, b0_reference_flops):
     train_loader, val_loader, num_classes = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
-        project="efficientnet_b0_TL_baseline",
+        project="efficientnet_deepmoe",
         group="sweep",
         name=f"id{model_id}_lam{lambda_g:.1e}_lr{LR_HEAD:.1e}",
         config={
