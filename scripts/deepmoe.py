@@ -19,22 +19,22 @@ import torch.nn as nn
 from torchvision.models.efficientnet import MBConv
 
 class ShallowEmbeddingNet(nn.Module):
-    def __init__(self, num_classes, latent_dim=64):
+    def __init__(self, num_classes, latent_dim=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.Conv2d(3, 8, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(8), nn.SiLU(),
+            nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(16), nn.SiLU(),
             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(32), nn.SiLU(),
+            nn.Conv2d(32, 32, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(32), nn.SiLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64), nn.SiLU(),
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(128), nn.SiLU(),
-            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(256), nn.SiLU(),
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(256, latent_dim),
+            nn.Linear(64, latent_dim),
         )
         self.softmax = nn.Softmax(dim=-1)
         self.aux_head = nn.Linear(latent_dim, num_classes)
@@ -74,31 +74,26 @@ class GatedMBConvWrapper(nn.Module):
 
     def forward(self, x, gate=None):
         identity = x
-
-        # 1. Expand & Depthwise
         x = self.expand(x)
-        x = self.depthwise(x)
-
-        # 2. ---> INJECT DEEPMOE GATE HERE <---
+        
+        # ---> INJECT GATE HERE (after expand, before depthwise) <---
         if gate is not None:
-            # Reshape from [Batch, Channels] to [Batch, Channels, 1, 1]
             x = x * gate.view(x.size(0), x.size(1), 1, 1)
-
-        # 3. SE & Project
+        
+        x = self.depthwise(x)
         x = self.se(x)
         x = self.project(x)
-
-        # 4. Residual Connection
+        
         if self.use_res_connect:
             return identity + self.stochastic_depth(x)
         return x
 
 class TransferDeepMoEEfficientNet(nn.Module):
-    def __init__(self, model_id=0, num_classes=1010, latent_dim=32, moe_start_stage=4, reference_flops=None):
+    def __init__(self, model_id=0, num_classes=1010, latent_dim=128, moe_start_stage=4, reference_flops=None):
         super().__init__()
         
         # 1. Load the Pre-trained Torchvision Model
-        if model_id == 0: # Note: The B1/B2/B3 models are at a slight disadvantage due to the cropped image, but this is fine
+        if model_id == 0: # Note: The B1/B2/B3 models are at a slight disadvantage due to the cropped image, but this is fine; the purpose is to find the optimal MoE architecture wrt the baseline EfficientNet B0
             self.base_model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
         elif model_id == 1:
             self.base_model = models.efficientnet_b1(weights=models.EfficientNet_B1_Weights.DEFAULT)
@@ -167,7 +162,7 @@ class TransferDeepMoEEfficientNet(nn.Module):
                     x = module(x, gate=gate)
 
                     if self.training:
-                        l1_loss += gate.abs().sum(dim=1).mean()
+                        l1_loss += gate.abs().sum(dim=1).mean() / gate.size(1)
                     active_experts += (gate > 0).float().sum()
                     total_experts += gate.numel()
                     
@@ -240,6 +235,7 @@ class TransferDeepMoEEfficientNet(nn.Module):
             self.static_overhead_flops += macs
 
         # --- 3. Profile the MBConv Body (Dynamic per channel) ---
+        # --- 3. Profile the MBConv Body (Dynamic per channel) ---
         block_idx = 0
         for stage_idx in range(1, 8):
             for module in self.base_model.features[stage_idx]:
@@ -257,15 +253,24 @@ class TransferDeepMoEEfficientNet(nn.Module):
                 c_reduced = module.se.fc1.out_channels
                 c_out = module.project[0].out_channels
                 
-                # Calculate MACs for exactly ONE hidden channel
-                macs_expand = c_in * H_in * W_in
+                # Calculate MACs for exactly ONE hidden channel (post-gate)
                 macs_depth = (k * k) * H_out * W_out
-                macs_se = 2 * c_reduced
+                macs_se = 2 * c_reduced  # Both FC1 input and FC2 output are skippable
                 macs_project = c_out * H_out * W_out
                 
-                cost_per_channel = float(macs_expand + macs_depth + macs_se + macs_project)
-                
+                cost_per_channel = float(macs_depth + macs_se + macs_project)
                 self.flops_per_channel[str(block_idx)] = cost_per_channel
+                
+                # Calculate Expand MACs (Pre-gate, 100% static overhead)
+                if not isinstance(module.expand, nn.Identity):
+                    macs_expand_total = float(c_in * module.hidden_dim * H_in * W_in)
+                else:
+                    macs_expand_total = 0.0
+                    
+                # Add expand to static overhead
+                self.static_overhead_flops += macs_expand_total
+                
+                # Add the maximum possible dynamic cost to the baseline body flops
                 self.total_baseline_body_flops += (cost_per_channel * module.hidden_dim)
                 
                 x = module.se(x)
@@ -277,6 +282,12 @@ class TransferDeepMoEEfficientNet(nn.Module):
             x, macs = count_macs(layer, x)
             self.static_overhead_flops += macs
 
+        # --- 5. Profile the MoE Gating Layers ---
+        for name, gate_seq in self.gates.items():
+            # gate_seq is nn.Sequential(nn.Linear, nn.ReLU)
+            linear_layer = gate_seq[0]
+            self.static_overhead_flops += linear_layer.in_features * linear_layer.out_features
+            
         x = self.base_model.avgpool(x)
         x = torch.flatten(x, 1)
         
@@ -289,7 +300,7 @@ class TransferDeepMoEEfficientNet(nn.Module):
 
 def objective(trial, b0_reference_flops):
     trial_start_time = time.time()
-    final_val_acc = 0
+    final_score = 0
     
     BATCH_SIZE = 256
     GRAD_ACCUM_STEPS = trial.suggest_int("grad_accum_steps", 4, 16, 2)
@@ -297,11 +308,13 @@ def objective(trial, b0_reference_flops):
     EPOCHS_BODY = 10 - EPOCHS_HEAD
 
     model_id = trial.suggest_int("model_id", 0, 2, 1)
-    mu = trial.suggest_float("mu", 1e-6, 1, log=True)
-    lambda_g = trial.suggest_float("lambda_g", 1e-7, 0.001, log=True)
-    lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.01, log=True)
-    lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.01, log=True)
-    lr_body_mul = trial.suggest_float("lr_body_mul", 0.0001, 0.01, log=True)
+    mu = trial.suggest_float("mu", 0, 1)
+    moe_start_stage = trial.suggest_int("moe_start_stage", 1, 5, 1)
+    latent_dim = trial.suggest_categorical("latent_dim", [32, 64, 128, 256])
+    lambda_g = trial.suggest_float("lambda_g", 1e-4, 1.0, log=True)
+    lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.1, log=True)
+    lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.1, log=True)
+    lr_body_mul = trial.suggest_float("lr_body_mul", 0.0001, 0.1, log=True)
     LR_HEAD = lr_head_mul * math.sqrt(GRAD_ACCUM_STEPS) 
     LR_HEAD2 = lr_head2_mul * math.sqrt(GRAD_ACCUM_STEPS) 
     LR_BODY = lr_body_mul * math.sqrt(GRAD_ACCUM_STEPS)  
@@ -328,7 +341,7 @@ def objective(trial, b0_reference_flops):
         reinit=True,
     )
     
-    model = TransferDeepMoEEfficientNet(model_id=model_id, reference_flops=b0_reference_flops)
+    model = TransferDeepMoEEfficientNet(model_id=model_id, reference_flops=b0_reference_flops, moe_start_stage=moe_start_stage, latent_dim=latent_dim)
     
     head_params = []
     body_params = []
@@ -342,12 +355,12 @@ def objective(trial, b0_reference_flops):
         head_optimizer = torch.optim.AdamW(head_params, lr=LR_HEAD, weight_decay=WEIGHT_DECAY)
 
         scheduler = ConstantLR(head_optimizer, factor=1, total_iters=1)
-        final_val_acc, pruned = train_loop_deepmoe(model, head_optimizer, scheduler, EPOCHS_HEAD, GRAD_ACCUM_STEPS, train_loader, val_loader, trial, 0, lambda_g, mu)
+        final_score, pruned = train_loop_deepmoe(model, head_optimizer, scheduler, EPOCHS_HEAD, GRAD_ACCUM_STEPS, train_loader, val_loader, trial, 0, lambda_g, mu)
         if pruned:
             total_runtime = time.time() - trial_start_time
             wandb.run.summary["state"] = "pruned"
             wandb.run.summary["total_runtime_seconds"] = total_runtime
-            wandb.run.summary["final_val_acc"] = final_val_acc
+            wandb.run.summary["final_score"] = final_score
             wandb.finish()
             del model, head_optimizer, train_loader, val_loader
             torch.cuda.empty_cache()
@@ -402,7 +415,7 @@ if __name__ == "__main__":
     sampler = optuna.samplers.TPESampler(multivariate=True)
 
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=10, n_warmup_steps=4, interval_steps=2
+        n_startup_trials=10, n_warmup_steps=4, interval_steps=2 # Will be done in parallel on many gpus
     )
 
     study = optuna.create_study(

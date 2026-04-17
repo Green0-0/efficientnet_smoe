@@ -266,11 +266,11 @@ def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, tr
             tradeoff_bonus = flops_saved_pct * 10.0
             epoch_score = final_val_acc + tradeoff_bonus
             
-            target_low, target_high = 0.30, 0.50
+            target_low, target_high = 0.50, 0.80
             if avg_val_flop_pct > target_high:
-                penalty = ((avg_val_flop_pct - target_high) / 0.10) ** 2 * 20.0
+                penalty = min(50.0, ((avg_val_flop_pct - target_high) / 0.10) ** 2 * 3.0)
             elif avg_val_flop_pct < target_low:
-                penalty = ((target_low - avg_val_flop_pct) / 0.10) ** 2 * 20.0
+                penalty = ((target_low - avg_val_flop_pct) / 0.10) ** 2 * 3.0
             else:
                 penalty = 0.0
             epoch_score = final_val_acc + tradeoff_bonus - penalty
