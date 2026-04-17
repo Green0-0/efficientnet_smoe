@@ -395,7 +395,7 @@ if __name__ == "__main__":
     del dummy_b0
     print(f"B0 Reference FLOPs locked at: {B0_REFERENCE_FLOPS}")
     
-    journal_file = os.path.join(SHARED_DIR, "journal.log")
+    journal_file = os.path.join(SHARED_DIR, "journal_deepmoe.log")
 
     storage = JournalStorage(JournalFileStorage(journal_file))
 
