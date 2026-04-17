@@ -46,3 +46,10 @@ Also began writing the b0_deepmoe. For consistency it will follow the logic in d
 Currently 25% done, but the code is AI generated.
 It will be difficult to determine how to reliably create a scoring function such that Optuna finds a neural network that is both sparse and accurate.
 Maybe we could do (sparsity under 100%) - a * (accuracy from 70%), where a=10 so that we ideally want 10% sparsity for each 1% in accuracy.
+
+4/16/26
+Finished preliminary code for deepmoe. Notes:
+- Flop calculation might be wrong; the gate might be at the wrong place and not gating enough of the network which overstates the sparsity gains.
+- Optuna was given a smooth boundary penalty and a linear formula for sparsity/validation
+- Multiple sizes of efficientnet are allowed to be swept, theoretical flops are calculated over all of them and compared against baseline
+- Batchnorms still train while the network is frozen.

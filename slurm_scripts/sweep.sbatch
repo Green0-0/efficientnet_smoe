@@ -11,4 +11,4 @@
 
 source .venv/bin/activate
 
-python scripts/b0_baseline.py
+python scripts/deepmoe.py
