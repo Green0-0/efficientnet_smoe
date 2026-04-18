@@ -189,8 +189,8 @@ class TransferDeepMoEEfficientNet(nn.Module):
                     x = module(x) # Execute normally without gating
                     active_experts += module.hidden_dim * x.size(0)
                     total_experts += module.hidden_dim * x.size(0)
-                    
-                    active_body_flops += (module.hidden_dim * self.flops_per_channel[idx_str])
+                    if track_flops:
+                        active_body_flops += (module.hidden_dim * self.flops_per_channel[idx_str])
                 
                 block_idx += 1
 
@@ -217,8 +217,8 @@ def objective(trial, b0_reference_flops):
     final_score = 0
     
     BATCH_SIZE = 256
-    GRAD_ACCUM_STEPS = trial.suggest_int("grad_accum_steps", 4, 16, 2)
-    EPOCHS_FINETUNE = trial.suggest_int("epochs_finetune", 0, 5, 1)
+    GRAD_ACCUM_STEPS = trial.suggest_int("grad_accum_steps", 4, 16, step=2)
+    EPOCHS_FINETUNE = trial.suggest_int("epochs_finetune", 0, 5, step=1)
     EPOCHS_JOINT = 10 - EPOCHS_FINETUNE # Note: The seperate head finetuning phase in the baseline script converged to epochs head = 0, meaning it was useless, we instead do the two-step finetuning described in the paper.
 
     model_id = 0 # Note: Due to the large size of the other efficientnet models, they struggle to be more efficient than b0 and their parameter activations go to zero to hit the sparsity req, thus we won't sweep them

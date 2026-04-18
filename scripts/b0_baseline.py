@@ -20,8 +20,8 @@ def objective(trial):
     final_val_acc = 0
     
     BATCH_SIZE = 256
-    GRAD_ACCUM_STEPS = trial.suggest_int("grad_accum_steps", 4, 16, 2)
-    EPOCHS_HEAD = trial.suggest_int("epochs_head", 0, 5, 1)
+    GRAD_ACCUM_STEPS = trial.suggest_int("grad_accum_steps", 4, 16, step=2)
+    EPOCHS_HEAD = trial.suggest_int("epochs_head", 0, 5, step=1)
     EPOCHS_BODY = 10 - EPOCHS_HEAD
 
     lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.1, log=True)
