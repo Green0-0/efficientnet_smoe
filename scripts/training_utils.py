@@ -188,7 +188,7 @@ def train_loop(model, optimizer, scheduler, epochs, grad_accum_steps, train_load
         raise e
     return final_val_acc, False
 
-def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, train_loader, val_loader, optuna_trial, optuna_trial_start_epoch, lambda_g, mu):
+def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, train_loader, val_loader, optuna_trial, optuna_trial_start_epoch, lambda_g, mu, freeze_routing=False):
     device = "cuda" # Note: An a5000 gpu or higher is expected, or the script will not work!
     model.to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
@@ -198,7 +198,11 @@ def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, tr
     try:
         for epoch in range(epochs):
             model.train()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
+
+            if freeze_routing:
+                model.embedding_net.eval()
+                model.gates.eval()
             
             for i, (images, labels) in enumerate(train_loader):
                 images = images.to(device, non_blocking=True)
@@ -217,7 +221,7 @@ def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, tr
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                     optimizer.step()
                     scheduler.step()
-                    optimizer.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
                     
                 if global_step % 50 == 0:
                     wandb.log(
@@ -263,7 +267,7 @@ def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, tr
             avg_val_flop_pct = val_flop_sum / len(val_loader)
             
             flops_saved_pct = 1.0 - avg_val_flop_pct
-            tradeoff_bonus = flops_saved_pct * 30.0
+            tradeoff_bonus = flops_saved_pct * (100.0 / 3.0)
             
             target_low, target_high = 0.50, 0.80
             if avg_val_flop_pct > target_high:

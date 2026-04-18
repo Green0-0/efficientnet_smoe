@@ -53,3 +53,12 @@ Finished preliminary code for deepmoe. Notes:
 - Optuna was given a smooth boundary penalty and a linear formula for sparsity/validation
 - Multiple sizes of efficientnet are allowed to be swept, theoretical flops are calculated over all of them and compared against baseline
 - Batchnorms still train while the network is frozen.
+
+4/17/26 - 4/18/26
+Updated sparsity reward to be 1%val/3%sparsity, as the earlier 1:10 reward was unsuitable and based on expert activation scores.
+Performed sweep. Sweep mostly worked out, but there are miscellaneous moderate bugs.
+
+4/18/26
+Updated flop calculator to correctly calculate both the baseline efficientnet and the deepmoe efficientnet flops (or macs, or whatever).
+Update gate to be after depthwise, before SE, this is the only location that seems appropriate.
+Redone training setup, no more warmup, only finetuning-joint phases.

@@ -24,8 +24,8 @@ def objective(trial):
     EPOCHS_HEAD = trial.suggest_int("epochs_head", 0, 5, 1)
     EPOCHS_BODY = 10 - EPOCHS_HEAD
 
-    lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.01, log=True)
-    lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.01, log=True)
+    lr_head_mul = trial.suggest_float("lr_head_mul", 0.0001, 0.1, log=True)
+    lr_head2_mul = trial.suggest_float("lr_head2_mul", 0.0001, 0.1, log=True)
     lr_body_mul = trial.suggest_float("lr_body_mul", 0.0001, 0.01, log=True)
     LR_HEAD = lr_head_mul * math.sqrt(GRAD_ACCUM_STEPS) 
     LR_HEAD2 = lr_head2_mul * math.sqrt(GRAD_ACCUM_STEPS) 
