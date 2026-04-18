@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 from torchvision.models.efficientnet import MBConv
 
-from scripts.flop_profiler import profile_deepmoe_flops
+from flop_profiler import profile_deepmoe_flops
 
 class ShallowEmbeddingNet(nn.Module):
     def __init__(self, num_classes, latent_dim=128):
