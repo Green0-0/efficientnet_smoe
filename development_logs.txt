@@ -62,3 +62,9 @@ Performed sweep. Sweep mostly worked out, but there are miscellaneous moderate b
 Updated flop calculator to correctly calculate both the baseline efficientnet and the deepmoe efficientnet flops (or macs, or whatever).
 Update gate to be after depthwise, before SE, this is the only location that seems appropriate.
 Redone training setup, no more warmup, only finetuning-joint phases.
+
+4/19/26
+Final deepmoe sweep done! Results are good.
+
+4/20/26
+Finished training, evaling models on test set (both deepmoe and baseline) and uploaded them to huggingface.

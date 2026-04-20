@@ -100,20 +100,20 @@ class GatedMBConvWrapper(nn.Module):
         return x
 
 class TransferDeepMoEEfficientNet(nn.Module):
-    def __init__(self, model_id=0, num_classes=1010, latent_dim=128, moe_start_stage=4, reference_flops=None, relu_init_val=0, relu_init_std=0.1):
+    def __init__(self, effnet_version=0, num_classes=1010, latent_dim=128, moe_start_stage=4, reference_flops=None, relu_init_val=0, relu_init_std=0.1):
         super().__init__()
         
         # 1. Load the Pre-trained Torchvision Model
-        if model_id == 0: # Note: The B1/B2/B3 models are at a slight disadvantage due to the cropped image, but this is fine; the purpose is to find the optimal MoE architecture wrt the baseline EfficientNet B0
+        if effnet_version == 0: # Note: The B1/B2/B3 models are at a slight disadvantage due to the cropped image, but this is fine; the purpose is to find the optimal MoE architecture wrt the baseline EfficientNet B0
             self.base_model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
-        elif model_id == 1:
+        elif effnet_version == 1:
             self.base_model = models.efficientnet_b1(weights=models.EfficientNet_B1_Weights.DEFAULT)
-        elif model_id == 2:
+        elif effnet_version == 2:
             self.base_model = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
-        elif model_id == 3:
+        elif effnet_version == 3:
             self.base_model = models.efficientnet_b3(weights=models.EfficientNet_B3_Weights.DEFAULT)
         else:
-            raise ValueError(f"Unsupported model_type: {model_id}")
+            raise ValueError(f"Unsupported model_type: {effnet_version}")
         for param in self.base_model.parameters():
             param.requires_grad = False
         
@@ -221,7 +221,7 @@ def objective(trial, b0_reference_flops):
     EPOCHS_FINETUNE = trial.suggest_int("epochs_finetune", 0, 5, step=1)
     EPOCHS_JOINT = 10 - EPOCHS_FINETUNE # Note: The seperate head finetuning phase in the baseline script converged to epochs head = 0, meaning it was useless, we instead do the two-step finetuning described in the paper.
 
-    model_id = 0 # Note: Due to the large size of the other efficientnet models, they struggle to be more efficient than b0 and their parameter activations go to zero to hit the sparsity req, thus we won't sweep them
+    effnet_version = 0 # Note: Due to the large size of the other efficientnet models, they struggle to be more efficient than b0 and their parameter activations go to zero to hit the sparsity req, thus we won't sweep them
     mu = trial.suggest_float("mu", 0, 1)
     relu_init_val = trial.suggest_float("relu_init_val", 0, 1)
     relu_init_std = trial.suggest_float("relu_init_std", 0.001, 1)
@@ -268,7 +268,7 @@ def objective(trial, b0_reference_flops):
     )
     
     model = TransferDeepMoEEfficientNet(
-        model_id=model_id, num_classes=num_classes,
+        effnet_version=effnet_version, num_classes=num_classes,
         reference_flops=b0_reference_flops,
         moe_start_stage=moe_start_stage, latent_dim=latent_dim,
         relu_init_val=relu_init_val,
