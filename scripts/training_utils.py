@@ -90,7 +90,7 @@ def get_dataloaders(batch_size):
 
     train_dataset = Subset(full_train_dataset, train_indices)
     val_dataset = Subset(full_val_dataset, val_indices)
-    # test_dataset = Subset(full_val_dataset, test_indices)
+    test_dataset = Subset(full_val_dataset, test_indices)
 
     slurm_cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", 4))
     num_workers = max(1, slurm_cpus - 2)
@@ -108,8 +108,15 @@ def get_dataloaders(batch_size):
         num_workers=min(2, num_workers),
         pin_memory=True,
     )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=min(2, num_workers),
+        pin_memory=True,
+    )
     
-    return train_loader, val_loader, num_classes
+    return train_loader, val_loader, test_loader, num_classes
 
 def train_loop(model, optimizer, scheduler, epochs, grad_accum_steps, train_loader, val_loader, optuna_trial, optuna_trial_start_epoch):
     device = "cuda" # Note: An a5000 gpu or higher is expected, or the script will not work!
@@ -293,8 +300,8 @@ def train_loop_deepmoe(model, optimizer, scheduler, epochs, grad_accum_steps, tr
             if optuna_trial != None:
                 optuna_trial.report(epoch_score, epoch + optuna_trial_start_epoch)
                 if optuna_trial.should_prune():
-                    return epoch_score, True
+                    return epoch_score, True, avg_val_active_pct, avg_val_flop_pct
     except Exception as e:
         wandb.run.summary["state"] = "crashed"
         raise e
-    return epoch_score, False
+    return epoch_score, False, avg_val_active_pct, avg_val_flop_pct

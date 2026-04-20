@@ -1,5 +1,5 @@
 # AI added the deepmoe portion, also transplanted some code from the old/preliminary tests that worked well (ref: ai_slop/deepmoe_sweep.py)
-from huggingface_hub import PyTorchModelHubMixin
+from huggingface_hub import PyTorchModelHubMixin, ModelCard, ModelCardData
 
 import math
 import os
@@ -227,7 +227,7 @@ def train(model_hf_id, b0_reference_flops, GRAD_ACCUM_STEPS, EPOCHS_FINETUNE, mu
     LR_BASE = lr_base_mul * math.sqrt(GRAD_ACCUM_STEPS)
     LR_FINETUNE = lr_finetune_mul * math.sqrt(GRAD_ACCUM_STEPS)
         
-    train_loader, val_loader, num_classes = get_dataloaders(BATCH_SIZE)
+    train_loader, _, test_loader, num_classes = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
         project="efficientnet_deepmoe_run",
@@ -284,7 +284,7 @@ def train(model_hf_id, b0_reference_flops, GRAD_ACCUM_STEPS, EPOCHS_FINETUNE, mu
         int(joint_steps * 0.1), 
         joint_steps
     )
-    final_score, _ = train_loop_deepmoe(model, shared_optim, shared_sched, EPOCHS_JOINT, GRAD_ACCUM_STEPS, train_loader, val_loader, None, 0, lambda_g, mu)
+    final_score, _, final_active_pct, final_flop_pct = train_loop_deepmoe(model, shared_optim, shared_sched, EPOCHS_JOINT, GRAD_ACCUM_STEPS, train_loader, test_loader, None, 0, lambda_g, mu)
 
     del shared_optim
     
@@ -306,24 +306,84 @@ def train(model_hf_id, b0_reference_flops, GRAD_ACCUM_STEPS, EPOCHS_FINETUNE, mu
             finetune_steps
         )
 
-        final_score, _ = train_loop_deepmoe(model, finetune_optim, finetune_sched, EPOCHS_FINETUNE, GRAD_ACCUM_STEPS, train_loader, val_loader, None, EPOCHS_JOINT, 0.0, 0.0, freeze_routing=True)
+        final_score, _, final_active_pct, final_flop_pct = train_loop_deepmoe(model, finetune_optim, finetune_sched, EPOCHS_FINETUNE, GRAD_ACCUM_STEPS, train_loader, test_loader, None, EPOCHS_JOINT, 0.0, 0.0, freeze_routing=True)
         
         del finetune_optim
         
+    # Calculate runtime early for the README
+    total_runtime = time.time() - trial_start_time
+
     if model_hf_id is not None and isinstance(model_hf_id, str):
         print(f"Pushing model to Hugging Face Hub: {model_hf_id}")
         model.push_to_hub(model_hf_id)
         
+        # --- Generate and Push the Model Card (README.md) ---
+        print("Pushing Model Card with DeepMoE training stats...")
+        
+        card_data = ModelCardData(
+            language="en",
+            tags=["image-classification", "pytorch", "efficientnet", "mixture-of-experts", "deepmoe"],
+            datasets=["inaturalist2019"],
+        )
+        
+        readme_text = f"""
+---
+{card_data.to_yaml()}
+---
+
+# DeepMoE EfficientNet-B0 fine-tuned on iNaturalist 2019
+
+This model is a Mixture-of-Experts (DeepMoE) variant of EfficientNet-B0, fine-tuned on the iNaturalist 2019 dataset to optimize both accuracy and computational efficiency (FLOP reduction).
+
+## Training Results
+- **Final Score (Acc/FLOPs composite)**: {final_score:.4f}
+- **Expert Activation Ratio**: {final_active_pct * 100:.1f}%
+- **FLOPs Usage**: {final_flop_pct * 100:.1f}% *(compared to baseline B0)*
+- **Baseline B0 Reference FLOPs**: {b0_reference_flops:,.0f}
+- **Total Runtime**: {total_runtime:.2f} seconds
+
+## Hyperparameters
+- **Batch Size**: {BATCH_SIZE}
+- **Gradient Accumulation Steps**: {GRAD_ACCUM_STEPS}
+- **Weight Decay**: {WEIGHT_DECAY}
+
+### Epochs
+- **Total Epochs**: {EPOCHS_JOINT + EPOCHS_FINETUNE}
+  - Joint Training Epochs: {EPOCHS_JOINT}
+  - Routing-Frozen Finetuning Epochs: {EPOCHS_FINETUNE}
+
+### DeepMoE Architecture & Routing
+- **MoE Start Stage**: {moe_start_stage}
+- **Latent Dimension**: {latent_dim}
+- **Sparsity Penalty ($\\lambda_g$)**: {lambda_g}
+- **Target Sparsity ($\\mu$)**: {mu}
+- **ReLU Init (Val / Std)**: {relu_init_val} / {relu_init_std}
+
+### Learning Rates
+- **MoE Routing Parameters**: {LR_MOE:.2e}
+- **Classification Head**: {LR_HEAD:.2e}
+- **Base Model (Body)**: {LR_BASE:.2e}
+- **Finetune Phase (Frozen Routing)**: {LR_FINETUNE:.2e}
+
+*Training was tracked using [Weights & Biases](https://wandb.ai).*
+"""
+        card = ModelCard(readme_text)
+        card.push_to_hub(model_hf_id)
+        
     wandb.run.summary.update({
         "state": "completed", 
         "final_score": final_score, 
-        "total_runtime_seconds": time.time() - trial_start_time
+        "final_active_pct": final_active_pct,
+        "final_flop_pct": final_flop_pct,
+        "total_runtime_seconds": total_runtime
     })
     wandb.finish()
     
-    del model, train_loader, val_loader
+    # Cleanup 
+    del model, train_loader, test_loader
     torch.cuda.empty_cache()
-    return final_score
+    
+    return final_score, final_active_pct, final_flop_pct
 
 if __name__ == "__main__":
     print("Loading baseline EfficientNet-B0...")
@@ -342,4 +402,9 @@ if __name__ == "__main__":
     print("-" * 40)
     del baseline_b0
     
-    train("G-reen/effnet_b0_iNat2019_deepmoe", B0_REFERENCE_FLOPS, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+    lambda_g_and_moe_lr = [0.0015, 0.004]
+    lambda_g_and_moe_lr = [0.0007, 0.005]
+    lambda_g_and_moe_lr = [0.0003, 0.02]
+    lambda_g_and_moe_lr = [0.00015, 0.05]
+    lambda_g_and_moe_lr = [0.00007, 0.06]
+    train(f"G-reen/effnet_b0_iNat2019_deepmoe_lambda{lambda_g_and_moe_lr[0]}", B0_REFERENCE_FLOPS, 4, 0, 0.5, 1, 1, 1, 32, lambda_g_and_moe_lr[0], 0.01, lambda_g_and_moe_lr[1], 0.001, 0, 0.005)

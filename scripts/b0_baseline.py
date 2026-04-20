@@ -33,7 +33,7 @@ def objective(trial):
     
     WEIGHT_DECAY = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
     
-    train_loader, val_loader, num_classes = get_dataloaders(BATCH_SIZE)
+    train_loader, val_loader, _, num_classes = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
         project="efficientnet_b0_TL_baseline",

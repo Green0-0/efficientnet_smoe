@@ -13682,3 +13682,4 @@
 {"op_code":7,"worker_id":"3b5e550c-6be8-4152-ac68-c5f107fe0ec0-139701840877376","trial_id":619,"step":3,"intermediate_value":58.00522434231481}
 {"op_code":7,"worker_id":"3b5e550c-6be8-4152-ac68-c5f107fe0ec0-139701840877376","trial_id":619,"step":4,"intermediate_value":62.93523989078593}
 {"op_code":6,"worker_id":"3b5e550c-6be8-4152-ac68-c5f107fe0ec0-139701840877376","trial_id":619,"state":2,"values":[62.93523989078593],"datetime_complete":"2026-04-19T20:28:18.844596"}
+{"op_code":0,"worker_id":"3cfafb32-ce6b-4503-bbda-e9725c405b05-140504777807680","study_name":"deepmoe","directions":[2]}
