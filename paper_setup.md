@@ -19,6 +19,9 @@
 ## DeepMoE transfer learning
 ### Hyperparameter analysis
 ### Sparsity-Validation graph
+# Interpretation
+## MoE channel visualization/baseline channel visualizaiton
+## MoE activation analysis
 # Conclusion
 # Future Work
 ## Scale EfficientNet size/channels
