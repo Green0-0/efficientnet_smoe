@@ -12,3 +12,4 @@ ruff
 ipykernel
 scipy
 scikit-learn
+huggingface_hub
