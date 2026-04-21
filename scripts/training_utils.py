@@ -84,7 +84,9 @@ def get_dataloaders(batch_size):
         ]
     )
 
-    data_dir = "/usr/project/xtmp/inaturalistdata_store"
+    # data_dir = "/usr/project/xtmp/inaturalistdata_store"
+
+    data_dir = "/hpc/group/wengerlab/inaturalist/data/"
 
     # Note: Torchvision does not seem to supply a 2019 val/train split, so we are manually creating one
     # Also, we use a tiny train dataset to speed up training on a smaller subset of the data
