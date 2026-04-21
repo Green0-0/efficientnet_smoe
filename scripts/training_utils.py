@@ -10,7 +10,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Subset
+from torch.utils.data import Subset, Dataset
 
 import math
 import torch
@@ -28,6 +28,40 @@ def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
         return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
     return LambdaLR(optimizer, lr_lambda)
+
+# Build taxonomic labels for visualization
+def build_super_labels(categories, level=2):
+    """
+    From iNaturalist:
+    level=2 → class (Mammalia)
+    level=3 → order (Carnivora)
+    level=4 → family (Canidae)
+    """
+    super_map = {}
+
+    for i, cat in enumerate(categories):
+        parts = cat.split("/")
+        super_name = "/".join(parts[:level])
+        super_map.setdefault(super_name, len(super_map))
+        super_map[i] = super_map[super_name]
+
+    return super_map
+
+from torch.utils.data import Dataset
+
+# Wrapper to wrap test dataset to obtain super labels
+class SuperLabelWrapper(Dataset):
+    def __init__(self, dataset, fine_to_super):
+        self.dataset = dataset
+        self.fine_to_super = fine_to_super
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        x, y = self.dataset[idx]
+        super_y = self.fine_to_super[y]
+        return x, y, super_y
 
 def get_dataloaders(batch_size):
     train_transforms = transforms.Compose(
@@ -90,7 +124,11 @@ def get_dataloaders(batch_size):
 
     train_dataset = Subset(full_train_dataset, train_indices)
     val_dataset = Subset(full_val_dataset, val_indices)
-    test_dataset = Subset(full_val_dataset, test_indices)
+
+    # Only the test dataset is wrapped with super labels
+    test_subset = Subset(full_val_dataset, test_indices)
+    fine_to_super = build_super_labels(full_train_dataset.all_categories)
+    test_dataset = SuperLabelWrapper(test_subset, fine_to_super)
 
     slurm_cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", 4))
     num_workers = max(1, slurm_cpus - 2)
