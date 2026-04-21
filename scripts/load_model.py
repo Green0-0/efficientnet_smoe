@@ -35,7 +35,7 @@ def extract_routing(model, dataloader, device, max_batches=5):
         torch.cat(all_super),
     )
 
-def tSNE_visualization(routes, super_labels, save_path):
+def tSNE_visualization(routes, super_labels, id_to_super_name, save_path):
     plt.figure()
     tsne = TSNE(n_components=2, perplexity=30)
     # Could add PCA if noisy
@@ -43,8 +43,20 @@ def tSNE_visualization(routes, super_labels, save_path):
     routes_np = PCA(n_components=50).fit_transform(routes_np)
     emb = tsne.fit_transform(routes_np)
 
-    plt.scatter(emb[:,0], emb[:,1], c=super_labels.cpu().numpy(), cmap='tab10', s=5)
+    # plt.scatter(emb[:,0], emb[:,1], c=super_labels.cpu().numpy(), cmap='tab10', s=5)
+    unique_labels = torch.unique(super_labels).cpu().numpy()
+
+    for u in unique_labels:
+        idx = super_labels == u
+        label_name = id_to_super_name.get(int(u), f"Class {u}")
+        plt.scatter(
+            emb[idx, 0],
+            emb[idx, 1],
+            s=5,
+            label=label_name
+        )
     plt.title("Routing Patterns (t-SNE)")
+    plt.legend()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close()
 
@@ -89,7 +101,7 @@ if __name__ == "__main__":
     BATCH_SIZE = 256
 
     print("Loading Test Dataset")
-    _, _, test_loader, _ = get_dataloaders(BATCH_SIZE)
+    _, _, test_loader, _, id_to_super_name = get_dataloaders(BATCH_SIZE)
 
     print("Extracting Routes")
     routes, super_labels = extract_routing(model, test_loader, device, max_batches=3)
@@ -98,7 +110,7 @@ if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     print("Attempting tSNE Visualization between Super Labels")
-    tSNE_visualization(routes, super_labels, save_path=os.path.join(OUTPUT_DIR, "tsne_routes.png"))
+    tSNE_visualization(routes, super_labels, id_to_super_name, save_path=os.path.join(OUTPUT_DIR, "tsne_routes_test.png"))
 
     unique = torch.unique(super_labels)
 
@@ -113,10 +125,10 @@ if __name__ == "__main__":
     # Mean routes are per super label
 
     print("Attempting Cosine Similarity Comparison between Super Labels")
-    cosine_sim_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "cos_sim.png"))
+    cosine_sim_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "cos_sim_test.png"))
 
     print("Attempting Heatmap Visualization between Super Labels")
-    heatmap_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "heatmaps.png"))
+    heatmap_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "heatmaps_test.png"))
     
 # Original testing:
 # transform = transforms.Compose([

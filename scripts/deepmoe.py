@@ -241,7 +241,7 @@ def objective(trial, b0_reference_flops):
     
     WEIGHT_DECAY = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
     
-    train_loader, val_loader, _, num_classes = get_dataloaders(BATCH_SIZE)
+    train_loader, val_loader, _, num_classes, _ = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
         project="efficientnet_deepmoe",

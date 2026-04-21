@@ -235,7 +235,7 @@ def train(model_hf_id, b0_reference_flops, GRAD_ACCUM_STEPS, EPOCHS_FINETUNE, mu
     LR_BASE = lr_base_mul * math.sqrt(GRAD_ACCUM_STEPS)
     LR_FINETUNE = lr_finetune_mul * math.sqrt(GRAD_ACCUM_STEPS)
         
-    train_loader, _, test_loader, num_classes = get_dataloaders(BATCH_SIZE)
+    train_loader, _, test_loader, num_classes, _ = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
         project="efficientnet_deepmoe_run",

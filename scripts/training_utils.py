@@ -30,24 +30,20 @@ def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
     return LambdaLR(optimizer, lr_lambda)
 
 # Build taxonomic labels for visualization
-def build_super_labels(categories, level=2):
-    """
-    From iNaturalist:
-    level=2 → class (Mammalia)
-    level=3 → order (Carnivora)
-    level=4 → family (Canidae)
-    """
-    super_map = {}
+def build_super_labels(categories, level=1):
+    # Level helps determine what level of information is taken from the data
+    super_name_to_id = {}
+    fine_to_super = {}
 
     for i, cat in enumerate(categories):
         parts = cat.split("/")
-        super_name = "/".join(parts[:level])
-        super_map.setdefault(super_name, len(super_map))
-        super_map[i] = super_map[super_name]
+        super_name = parts[0]
+        if super_name not in super_name_to_id:
+            super_name_to_id[super_name] = len(super_name_to_id)
+        fine_to_super[i] = super_name_to_id[super_name]
 
-    return super_map
-
-from torch.utils.data import Dataset
+    id_to_super_name = {v: k for k, v in super_name_to_id.items()}
+    return fine_to_super, id_to_super_name
 
 # Wrapper to wrap test dataset to obtain super labels
 class SuperLabelWrapper(Dataset):
@@ -129,7 +125,7 @@ def get_dataloaders(batch_size):
 
     # Only the test dataset is wrapped with super labels
     test_subset = Subset(full_val_dataset, test_indices)
-    fine_to_super = build_super_labels(full_train_dataset.all_categories)
+    fine_to_super, id_to_super_name = build_super_labels(full_train_dataset.all_categories,level=1)
     test_dataset = SuperLabelWrapper(test_subset, fine_to_super)
 
     slurm_cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", 4))
@@ -156,7 +152,7 @@ def get_dataloaders(batch_size):
         pin_memory=True,
     )
     
-    return train_loader, val_loader, test_loader, num_classes
+    return train_loader, val_loader, test_loader, num_classes, id_to_super_name
 
 def train_loop(model, optimizer, scheduler, epochs, grad_accum_steps, train_loader, val_loader, optuna_trial, optuna_trial_start_epoch):
     device = "cuda" # Note: An a5000 gpu or higher is expected, or the script will not work!
