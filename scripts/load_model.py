@@ -11,28 +11,49 @@ from training_utils import get_dataloaders
 import os
 from sklearn.decomposition import PCA
 
-def extract_routing(model, dataloader, device, max_batches=5):
+def extract_routing(model, dataloader, device, max_batches=None):
     model.eval()
     
     all_routes = []
     all_super = []
 
+    correct = 0
+    total = 0
+    active_pct_sum = float(0)
+    flop_pct_sum = float(0)
+    num_batches = 0
+
     with torch.no_grad():
-        for i, (x, _, super_y) in enumerate(dataloader): 
-            if i > max_batches:
+        for i, (x, y, super_y) in enumerate(dataloader): 
+            if max_batches is not None and i >= max_batches:
                 break
             x = x.to(device)
+            y = y.to(device)
             
-            _, _, gates = model(x, return_gates=True)  # forward once to populate gates
-            
+            logits, active_pct, flop_pct, gates = model(x, return_gates=True)  # forward once to populate gates
+            probabilities = torch.nn.functional.softmax(logits, dim=-1)
+            predicted_classes = torch.argmax(probabilities, dim=-1)
+
+            correct += (predicted_classes == y).sum().item()
+            total += y.size(0)
+            active_pct_sum += active_pct.item()
+            flop_pct_sum += flop_pct.item()
+            num_batches += 1
+
             route = torch.cat(gates, dim=1)  # [B, total_channels]
             
-            all_routes.append(route)
-            all_super.append(super_y.view(-1))
+            all_routes.append(route.cpu())
+            all_super.append(super_y.view(-1).cpu())
 
+    top1_acc = 100.0 * correct / total
+    avg_active_pct = active_pct_sum / num_batches * 100
+    avg_flop_pct = flop_pct_sum / num_batches * 100
     return (
         torch.cat(all_routes),
         torch.cat(all_super),
+        top1_acc,
+        avg_active_pct,
+        avg_flop_pct
     )
 
 def tSNE_visualization(routes, super_labels, id_to_super_name, save_path):
@@ -104,7 +125,12 @@ if __name__ == "__main__":
     _, _, test_loader, _, id_to_super_name = get_dataloaders(BATCH_SIZE)
 
     print("Extracting Routes")
-    routes, super_labels = extract_routing(model, test_loader, device, max_batches=3)
+    # routes, super_labels, top1_acc, avg_active_pct, avg_flop_pct = extract_routing(model, test_loader, device, max_batches=3)
+    routes, super_labels, top1_acc, avg_active_pct, avg_flop_pct = extract_routing(model, test_loader, device)
+    
+    print(f"Top 1 Accuracy: {top1_acc:.4f}%")
+    print(f"Expert Activation: {avg_active_pct:.4f}%")
+    print(f"FLOP activation: {avg_flop_pct:.4f}%")
 
     OUTPUT_DIR = "visualizations"
     os.makedirs(OUTPUT_DIR, exist_ok=True)

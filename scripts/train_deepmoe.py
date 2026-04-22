@@ -216,7 +216,7 @@ class TransferDeepMoEEfficientNet(nn.Module, PyTorchModelHubMixin):
         else:
             flop_retention_pct = torch.tensor(1.0, device=x.device)
         if return_gates:
-            return x, aux_logits, collected_gates
+            return x, active_pct, flop_retention_pct, collected_gates
         if self.training:
             return x, aux_logits, l1_loss, active_pct, flop_retention_pct
         return x, active_pct, flop_retention_pct
