@@ -56,9 +56,9 @@ def extract_routing(model, dataloader, device, max_batches=None):
         avg_flop_pct
     )
 
-def tSNE_visualization(routes, super_labels, id_to_super_name, save_path):
+def tSNE_visualization(routes, super_labels, id_to_super_name, save_path, perplexity=30):
     plt.figure()
-    tsne = TSNE(n_components=2, perplexity=30)
+    tsne = TSNE(n_components=2, perplexity=perplexity)
     # Could add PCA if noisy
     routes_np = routes.cpu().numpy()
     routes_np = PCA(n_components=50).fit_transform(routes_np)
@@ -81,6 +81,7 @@ def tSNE_visualization(routes, super_labels, id_to_super_name, save_path):
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close()
 
+# High cosine similarity between super labels on multiple runs
 def cosine_sim_visualization(mean_routes, save_path):
     plt.figure()
     mean_routes = F.normalize(mean_routes, dim=1)
@@ -95,6 +96,8 @@ def cosine_sim_visualization(mean_routes, save_path):
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close()
 
+# The following is not entirely correctly implemented and should be discarded
+# Essentially, would need slices of layers of model to implement crrectly
 def heatmap_visualization(mean_routes,save_path):
     plt.figure()
     plt.imshow(mean_routes.numpy(), aspect='auto')
@@ -136,25 +139,25 @@ if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     print("Attempting tSNE Visualization between Super Labels")
-    tSNE_visualization(routes, super_labels, id_to_super_name, save_path=os.path.join(OUTPUT_DIR, "tsne_routes_test.png"))
+    tSNE_visualization(routes, super_labels, id_to_super_name, save_path=os.path.join(OUTPUT_DIR, "tsne_routes_test.png"), perplexity=30)
 
-    unique = torch.unique(super_labels)
+    # unique = torch.unique(super_labels)
 
-    mean_routes = []
+    # mean_routes = []
 
-    for u in unique:
-        mask = (super_labels == u)
-        mean_route = routes[mask].mean(dim=0)
-        mean_routes.append(mean_route)
+    # for u in unique:
+    #     mask = (super_labels == u)
+    #     mean_route = routes[mask].mean(dim=0)
+    #     mean_routes.append(mean_route)
 
-    mean_routes = torch.stack(mean_routes)  # [num_super, total_channels]
-    # Mean routes are per super label
+    # mean_routes = torch.stack(mean_routes)  # [num_super, total_channels]
+    # # Mean routes are per super label
 
-    print("Attempting Cosine Similarity Comparison between Super Labels")
-    cosine_sim_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "cos_sim_test.png"))
+    # print("Attempting Cosine Similarity Comparison between Super Labels")
+    # cosine_sim_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "cos_sim_test.png"))
 
-    print("Attempting Heatmap Visualization between Super Labels")
-    heatmap_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "heatmaps_test.png"))
+    # print("Attempting Heatmap Visualization between Super Labels")
+    # heatmap_visualization(mean_routes, save_path=os.path.join(OUTPUT_DIR, "heatmaps_test.png"))
     
 # Original testing:
 # transform = transforms.Compose([
