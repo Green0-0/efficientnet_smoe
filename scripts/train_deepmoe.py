@@ -1,4 +1,4 @@
-# AI added the deepmoe portion, also transplanted some code from the old/preliminary tests that worked well (ref: ai_slop/deepmoe_sweep.py)
+# AI assisted with the deepmoe portion, also transplanted some code from the old/preliminary tests that worked well (ref: historic_scripts/deepmoe_sweep.py)
 from huggingface_hub import PyTorchModelHubMixin, ModelCard, ModelCardData
 
 import math
