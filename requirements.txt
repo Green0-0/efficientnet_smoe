@@ -12,4 +12,5 @@ ruff
 ipykernel
 scipy
 scikit-learn
+matplotlib
 huggingface_hub

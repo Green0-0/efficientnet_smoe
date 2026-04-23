@@ -10,7 +10,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Subset
+from torch.utils.data import Subset, Dataset
 
 import math
 import torch
@@ -28,6 +28,36 @@ def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
         return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
     return LambdaLR(optimizer, lr_lambda)
+
+# Build taxonomic labels for visualization
+def build_super_labels(categories, level=1):
+    # Level helps determine what level of information is taken from the data
+    super_name_to_id = {}
+    fine_to_super = {}
+
+    for i, cat in enumerate(categories):
+        parts = cat.split("/")
+        super_name = parts[0]
+        if super_name not in super_name_to_id:
+            super_name_to_id[super_name] = len(super_name_to_id)
+        fine_to_super[i] = super_name_to_id[super_name]
+
+    id_to_super_name = {v: k for k, v in super_name_to_id.items()}
+    return fine_to_super, id_to_super_name
+
+# Wrapper to wrap test dataset to obtain super labels
+class SuperLabelWrapper(Dataset):
+    def __init__(self, dataset, fine_to_super):
+        self.dataset = dataset
+        self.fine_to_super = fine_to_super
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        x, y = self.dataset[idx]
+        super_y = self.fine_to_super[y]
+        return x, y, super_y
 
 def get_dataloaders(batch_size):
     train_transforms = transforms.Compose(
@@ -50,7 +80,9 @@ def get_dataloaders(batch_size):
         ]
     )
 
-    data_dir = "/usr/project/xtmp/inaturalistdata_store"
+    # data_dir = "/usr/project/xtmp/inaturalistdata_store"
+
+    data_dir = "/hpc/group/wengerlab/inaturalist/data/"
 
     # Note: Torchvision does not seem to supply a 2019 val/train split, so we are manually creating one
     # Also, we use a tiny train dataset to speed up training on a smaller subset of the data
@@ -90,7 +122,11 @@ def get_dataloaders(batch_size):
 
     train_dataset = Subset(full_train_dataset, train_indices)
     val_dataset = Subset(full_val_dataset, val_indices)
-    test_dataset = Subset(full_val_dataset, test_indices)
+
+    # Only the test dataset is wrapped with super labels
+    test_subset = Subset(full_val_dataset, test_indices)
+    fine_to_super, id_to_super_name = build_super_labels(full_train_dataset.all_categories,level=1)
+    test_dataset = SuperLabelWrapper(test_subset, fine_to_super)
 
     slurm_cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", 4))
     num_workers = max(1, slurm_cpus - 2)
@@ -116,7 +152,7 @@ def get_dataloaders(batch_size):
         pin_memory=True,
     )
     
-    return train_loader, val_loader, test_loader, num_classes
+    return train_loader, val_loader, test_loader, num_classes, id_to_super_name
 
 def train_loop(model, optimizer, scheduler, epochs, grad_accum_steps, train_loader, val_loader, optuna_trial, optuna_trial_start_epoch):
     device = "cuda" # Note: An a5000 gpu or higher is expected, or the script will not work!

@@ -35,7 +35,7 @@ def train(model_hf_id, GRAD_ACCUM_STEPS, EPOCHS_HEAD, lr_head_mul, lr_head2_mul,
     LR_BODY = lr_body_mul * math.sqrt(GRAD_ACCUM_STEPS)  
     
     
-    train_loader, _, test_loader, num_classes = get_dataloaders(BATCH_SIZE)
+    train_loader, _, test_loader, num_classes, _ = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
         project="efficientnet_b0_TL_run",

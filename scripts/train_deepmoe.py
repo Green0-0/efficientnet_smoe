@@ -158,7 +158,7 @@ class TransferDeepMoEEfficientNet(nn.Module, PyTorchModelHubMixin):
         self.static_overhead_flops = profiling_stats["static"]
         self.flops_per_channel = profiling_stats["per_channel"]
 
-    def forward(self, x):
+    def forward(self, x, return_gates=False):
         track_flops = bool(self.flops_per_channel)
         e, aux_logits = self.embedding_net(x)
 
@@ -167,6 +167,9 @@ class TransferDeepMoEEfficientNet(nn.Module, PyTorchModelHubMixin):
         total_experts = 0.0
         active_body_flops = 0.0
         
+        if return_gates:
+            collected_gates = []
+
         # We must manually iterate through the base_model features to pass the gate tensor
         x = self.base_model.features[0](x) # Stem
 
@@ -177,6 +180,10 @@ class TransferDeepMoEEfficientNet(nn.Module, PyTorchModelHubMixin):
                 idx_str = str(block_idx)
                 if idx_str in self.gates:
                     gate = self.gates[idx_str](e)
+
+                    if return_gates:
+                        collected_gates.append(gate.detach().cpu())
+
                     x = module(x, gate=gate)
 
                     if self.training:
@@ -208,7 +215,8 @@ class TransferDeepMoEEfficientNet(nn.Module, PyTorchModelHubMixin):
             flop_retention_pct = total_active_flops / self.reference_flops
         else:
             flop_retention_pct = torch.tensor(1.0, device=x.device)
-
+        if return_gates:
+            return x, active_pct, flop_retention_pct, collected_gates
         if self.training:
             return x, aux_logits, l1_loss, active_pct, flop_retention_pct
         return x, active_pct, flop_retention_pct
@@ -227,7 +235,7 @@ def train(model_hf_id, b0_reference_flops, GRAD_ACCUM_STEPS, EPOCHS_FINETUNE, mu
     LR_BASE = lr_base_mul * math.sqrt(GRAD_ACCUM_STEPS)
     LR_FINETUNE = lr_finetune_mul * math.sqrt(GRAD_ACCUM_STEPS)
         
-    train_loader, _, test_loader, num_classes = get_dataloaders(BATCH_SIZE)
+    train_loader, _, test_loader, num_classes, _ = get_dataloaders(BATCH_SIZE)
 
     run = wandb.init(
         project="efficientnet_deepmoe_run",
